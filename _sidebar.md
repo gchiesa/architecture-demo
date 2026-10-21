@@ -1,1 +1,4 @@
 - [Home](/)
+- Design Docs
+  - Area: Platform
+    - [New engineering doc](design-docs/platform/new-engineering-doc/README.md)
