@@ -22,6 +22,8 @@ jobs:
           FILTER_VALUES: Ready to Sync
           ARTICLE_PATH: "articles/{title}/README.md"
           ASSETS_PATH: "articles/{title}/images"
+          PARALLEL_PAGES: 3
+          PARALLEL_DOWNLOADS_PER_PAGE: 3
 
       - name: Commit and Push Changes
         run: |
