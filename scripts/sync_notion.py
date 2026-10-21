@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "notion-client>=2.2.1",
+#   "notion-client>=3.1.0,<4",
 #   "requests>=2.31.0",
 # ]
 # ///
@@ -25,12 +25,12 @@ def require_env(name: str) -> str:
     return value
 
 
-def query_ready_to_sync(notion: Client, database_id: str) -> list[dict]:
+def query_ready_to_sync(notion: Client, data_source_id: str) -> list[dict]:
     pages: list[dict] = []
     cursor = None
     while True:
-        response = notion.databases.query(
-            database_id=database_id,
+        response = notion.data_sources.query(
+            data_source_id=data_source_id,
             filter={"property": "Sync", "select": {"equals": "Ready to Sync"}},
             start_cursor=cursor,
         )
@@ -83,8 +83,8 @@ def render_page(notion: Client, page: dict, dest_dir: Path, extra_frontmatter: d
     print(f'Synced "{title}" -> {dest_dir}/README.md')
 
 
-def sync_adr(notion: Client, database_id: str) -> int:
-    pages = query_ready_to_sync(notion, database_id)
+def sync_adr(notion: Client, data_source_id: str) -> int:
+    pages = query_ready_to_sync(notion, data_source_id)
     for page in pages:
         dest_dir = adr_dest_dir(page["properties"])
         render_page(
@@ -101,8 +101,8 @@ def sync_adr(notion: Client, database_id: str) -> int:
     return len(pages)
 
 
-def sync_design_docs(notion: Client, database_id: str) -> int:
-    pages = query_ready_to_sync(notion, database_id)
+def sync_design_docs(notion: Client, data_source_id: str) -> int:
+    pages = query_ready_to_sync(notion, data_source_id)
     for page in pages:
         dest_dir = design_doc_dest_dir(page["properties"])
         render_page(
@@ -119,13 +119,13 @@ def sync_design_docs(notion: Client, database_id: str) -> int:
 
 def main() -> None:
     notion_secret = require_env("NOTION_SECRET")
-    adr_database_id = require_env("ADR_DATABASE_ID")
-    design_doc_database_id = require_env("DESIGN_DOC_DATABASE_ID")
+    adr_data_source_id = require_env("ADR_DATA_SOURCE_ID")
+    design_doc_data_source_id = require_env("DESIGN_DOC_DATA_SOURCE_ID")
 
     notion = Client(auth=notion_secret)
 
-    adr_count = sync_adr(notion, adr_database_id)
-    design_doc_count = sync_design_docs(notion, design_doc_database_id)
+    adr_count = sync_adr(notion, adr_data_source_id)
+    design_doc_count = sync_design_docs(notion, design_doc_data_source_id)
     print(f"Done. {adr_count} ADR page(s), {design_doc_count} Design Doc page(s).")
 
 
