@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -78,6 +79,14 @@ def get_property_value(properties: dict, prop_name: str):
     return None
 
 
+def content_hash(body: str) -> str:
+    """Fingerprint of a doc's body (frontmatter stripped), recorded in the
+    `content_hash` frontmatter field after every successful sync in either
+    direction. Comparing against it is how the GitHub -> Notion push-back
+    script tells "actually edited since last sync" from "just re-synced"."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
 def to_frontmatter(fields: dict) -> str:
     lines = ["---"]
     for key, value in fields.items():
@@ -153,6 +162,46 @@ def fetch_page_markdown(notion_secret: str, page_id: str) -> str:
     if data.get("truncated"):
         print(f"Warning: page {page_id} markdown was truncated ({len(data.get('unknown_block_ids', []))} block(s) omitted)")
     return data["markdown"]
+
+
+def get_page(notion_secret: str, page_id: str) -> dict:
+    import requests
+
+    response = requests.get(
+        f"https://api.notion.com/v1/pages/{page_id}",
+        headers={
+            "Authorization": f"Bearer {notion_secret}",
+            "Notion-Version": NOTION_API_VERSION,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def push_page_markdown(notion_secret: str, page_id: str, body: str) -> dict:
+    """Replace a page's content with `body` via Notion's Markdown Content API
+    (same v2 dialect `fetch_page_markdown` reads). Returns the API response,
+    which may carry a `warnings` list (e.g. unsupported v2 syntax) even on
+    success."""
+    import requests
+
+    response = requests.patch(
+        f"https://api.notion.com/v1/pages/{page_id}/markdown",
+        headers={
+            "Authorization": f"Bearer {notion_secret}",
+            "Notion-Version": NOTION_API_VERSION,
+            "Content-Type": "application/json",
+        },
+        json={
+            "type": "replace_content",
+            "new_str": body,
+            "markdown_version": "v2",
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 def localize_images(markdown: str, assets_dir: Path) -> str:

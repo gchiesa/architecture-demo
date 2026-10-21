@@ -1,0 +1,52 @@
+name: Push GitHub Edits Back to Notion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ADR/**/README.md"
+      - "design-docs/**/README.md"
+      - "PRD/**/README.md"
+
+jobs:
+  push-back:
+    # Skip commits made by the Notion -> GitHub sync bot itself, otherwise
+    # every pull from Notion immediately triggers a push right back to it.
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup mise
+        uses: jdx/mise-action@v2
+
+      - name: Find changed docs
+        id: changed
+        run: |
+          files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'ADR/**/README.md' 'design-docs/**/README.md' 'PRD/**/README.md')
+          echo "files<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$files" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Push changed docs to Notion
+        if: steps.changed.outputs.files != ''
+        env:
+          NOTION_SECRET: ${{ secrets.NOTION_SECRET }}
+        run: mise run push-to-notion -- ${{ steps.changed.outputs.files }}
+
+      - name: Commit sync metadata
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No metadata changes to commit"
+          else
+            git commit -m "Record Notion push-back sync state"
+            git push
+          fi

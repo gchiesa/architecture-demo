@@ -8,3 +8,7 @@ run = "./.ci/scripts/sync-notion.sh"
 [tasks.gen-sidebar]
 description = "Regenerate docsify _sidebar.md from ADR + Design Doc docs"
 run = "./.ci/scripts/gen-sidebar.sh"
+
+[tasks.push-to-notion]
+description = "Push changed synced docs' bodies back to their Notion pages"
+run = "./.ci/scripts/push-to-notion.sh"
