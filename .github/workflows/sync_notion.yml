@@ -16,6 +16,7 @@ jobs:
       - name: Sync Notion to Markdown
         uses: victornpb/notion-jam@v0.0.13
         with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOTION_SECRET: ${{ secrets.NOTION_SECRET }}
           NOTION_DATABASE: ${{ secrets.NOTION_DATABASE }}
           FILTER_PROP: Sync
