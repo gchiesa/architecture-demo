@@ -28,6 +28,18 @@ jobs:
           PARALLEL_PAGES: 3
           PARALLEL_DOWNLOADS_PER_PAGE: 3
 
+      - name: Generate docsify sidebar
+        run: |
+          {
+            echo "- [Home](/)"
+            echo "- Articles"
+            for f in $(find articles -mindepth 2 -maxdepth 2 -name README.md | sort); do
+              title=$(grep -m1 '^title:' "$f" | sed 's/^title:[[:space:]]*//')
+              [ -z "$title" ] && title=$(basename "$(dirname "$f")")
+              echo "  - [$title]($f)"
+            done
+          } > _sidebar.md
+
       - name: Commit and Push Changes
         run: |
           git config --global user.name "github-actions[bot]"
