@@ -3,18 +3,30 @@
 # dependencies = [
 #   "notion-client>=3.1.0,<4",
 #   "requests>=2.31.0",
+#   "pyyaml>=6.0",
 # ]
 # ///
 import os
+import shutil
 import sys
 from pathlib import Path
 
 from notion_client import Client
 
-from notion_blocks_to_md import page_to_markdown
-from notion_sync_lib import get_select, get_status, get_title, slugify, to_frontmatter
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
+from notion_sync_lib import (
+    REPO_ROOT,
+    build_docsify_url,
+    fetch_page_markdown,
+    get_select,
+    get_status,
+    get_title,
+    load_sections,
+    load_site_base_url,
+    localize_images,
+    resolve_template,
+    slugify,
+    to_frontmatter,
+)
 
 
 def require_env(name: str) -> str:
@@ -41,31 +53,38 @@ def query_ready_to_sync(notion: Client, data_source_id: str) -> list[dict]:
     return pages
 
 
-def adr_dest_dir(properties: dict) -> Path:
+def build_context(section: dict, properties: dict) -> dict:
+    """Lowercased frontmatter-field values read off a page's Notion properties."""
+    return {
+        prop: get_select(properties, prop.capitalize())
+        for prop in section.get("frontmatter_properties", [])
+    }
+
+
+def dest_dir(section: dict, properties: dict, context: dict) -> Path:
     slug = slugify(get_title(properties))
-    scope = get_select(properties, "Scope")
-    if scope == "Global":
-        return Path("ADR") / "global" / slug
-    if scope == "Area":
-        return Path("ADR") / slugify(get_select(properties, "Area") or "unknown-area") / slug
-    if scope == "Component":
-        return Path("ADR") / slugify(get_select(properties, "Component") or "unknown-component") / slug
-    raise ValueError(f"ADR page '{get_title(properties)}' has unrecognized Scope: {scope}")
+    group_value = context.get(section["group_by"])
+    segment_template = resolve_template(
+        section.get("path_templates"), section.get("default_path_template"), group_value, context
+    )
+    if segment_template is None:
+        raise ValueError(
+            f"{section['label']} page '{get_title(properties)}' has unrecognized "
+            f"{section['group_by']}: {group_value}"
+        )
+    return Path(section["root"]) / slugify(segment_template) / slug
 
 
-def design_doc_dest_dir(properties: dict) -> Path:
-    slug = slugify(get_title(properties))
-    area = get_select(properties, "Area") or "unknown-area"
-    return Path("design-docs") / slugify(area) / slug
-
-
-def render_page(notion: Client, page: dict, dest_dir: Path, extra_frontmatter: dict) -> None:
+def render_page(
+    notion_secret: str, page: dict, dest: Path, extra_frontmatter: dict, site_base_url: str
+) -> None:
     title = get_title(page["properties"])
-    full_dest_dir = REPO_ROOT / dest_dir
+    full_dest_dir = REPO_ROOT / dest
     full_dest_dir.mkdir(parents=True, exist_ok=True)
     assets_dir = full_dest_dir / "images"
 
-    body = page_to_markdown(notion, page["id"], assets_dir)
+    markdown = fetch_page_markdown(notion_secret, page["id"])
+    body = localize_images(markdown, assets_dir)
 
     frontmatter = to_frontmatter(
         {
@@ -75,58 +94,61 @@ def render_page(notion: Client, page: dict, dest_dir: Path, extra_frontmatter: d
             "created_time": page["created_time"],
             "last_edited_time": page["last_edited_time"],
             "notion_url": page["url"],
+            "docsify_url": build_docsify_url(site_base_url, dest),
             **extra_frontmatter,
         }
     )
 
     (full_dest_dir / "README.md").write_text(frontmatter + body, encoding="utf-8")
-    print(f'Synced "{title}" -> {dest_dir}/README.md')
+    print(f'Synced "{title}" -> {dest}/README.md')
 
 
-def sync_adr(notion: Client, data_source_id: str) -> int:
+def sync_section(notion: Client, notion_secret: str, section: dict, site_base_url: str) -> list[Path]:
+    data_source_id = require_env(section["notion_data_source_env"])
     pages = query_ready_to_sync(notion, data_source_id)
+    dest_dirs = []
     for page in pages:
-        dest_dir = adr_dest_dir(page["properties"])
-        render_page(
-            notion,
-            page,
-            dest_dir,
-            {
-                "type": "ADR",
-                "scope": get_select(page["properties"], "Scope"),
-                "area": get_select(page["properties"], "Area"),
-                "component": get_select(page["properties"], "Component"),
-            },
-        )
-    return len(pages)
+        context = build_context(section, page["properties"])
+        dest = dest_dir(section, page["properties"], context)
+        render_page(notion_secret, page, dest, {"type": section["type"], **context}, site_base_url)
+        dest_dirs.append(dest)
+    return dest_dirs
 
 
-def sync_design_docs(notion: Client, data_source_id: str) -> int:
-    pages = query_ready_to_sync(notion, data_source_id)
-    for page in pages:
-        dest_dir = design_doc_dest_dir(page["properties"])
-        render_page(
-            notion,
-            page,
-            dest_dir,
-            {
-                "type": "Design Doc",
-                "area": get_select(page["properties"], "Area"),
-            },
-        )
-    return len(pages)
+def remove_stale_docs(root: Path, expected_dirs: set[Path]) -> int:
+    """Delete any previously-synced doc under `root` whose directory is not
+    in `expected_dirs` (unsynced, moved to a new path, or deleted in Notion)."""
+    full_root = REPO_ROOT / root
+    if not full_root.exists():
+        return 0
+
+    removed = 0
+    for readme in sorted(full_root.rglob("README.md")):
+        doc_dir = readme.parent
+        if doc_dir.relative_to(REPO_ROOT) not in expected_dirs:
+            print(f"Removing stale doc {doc_dir.relative_to(REPO_ROOT)}")
+            shutil.rmtree(doc_dir)
+            removed += 1
+
+    _prune_empty_dirs(full_root)
+    return removed
+
+
+def _prune_empty_dirs(root: Path) -> None:
+    for dirpath in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: -len(p.parts)):
+        if not any(dirpath.iterdir()):
+            dirpath.rmdir()
 
 
 def main() -> None:
     notion_secret = require_env("NOTION_SECRET")
-    adr_data_source_id = require_env("ADR_DATA_SOURCE_ID")
-    design_doc_data_source_id = require_env("DESIGN_DOC_DATA_SOURCE_ID")
-
     notion = Client(auth=notion_secret)
+    site_base_url = load_site_base_url()
 
-    adr_count = sync_adr(notion, adr_data_source_id)
-    design_doc_count = sync_design_docs(notion, design_doc_data_source_id)
-    print(f"Done. {adr_count} ADR page(s), {design_doc_count} Design Doc page(s).")
+    for section in load_sections():
+        dest_dirs = sync_section(notion, notion_secret, section, site_base_url)
+        removed = remove_stale_docs(Path(section["root"]), set(dest_dirs))
+        print(f"{section['label']}: {len(dest_dirs)} synced, {removed} stale removed.")
 
 
 if __name__ == "__main__":

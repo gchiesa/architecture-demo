@@ -7,10 +7,7 @@
 import re
 from pathlib import Path
 
-import yaml
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-CONFIG_PATH = REPO_ROOT / "sidebar.yaml"
+from notion_sync_lib import REPO_ROOT, load_sections, resolve_template
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
@@ -38,25 +35,18 @@ def find_readmes(root: Path) -> list[Path]:
     return sorted(root.rglob("README.md"))
 
 
-def load_sections() -> list[dict]:
-    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
-    return config["sections"]
-
-
-def group_label(section: dict, fm: dict) -> str:
-    group_by = section["group_by"]
-    value = fm.get(group_by)
-    templates = section.get("group_label_templates") or {}
-    template = templates.get(value, section.get("default_group_label_template", "{value}"))
-    return template.format(value=value, **fm)
-
-
 def build_section(section: dict) -> list[str]:
     files = find_readmes(REPO_ROOT / section["root"])
     groups: dict[str, list[tuple[str, Path]]] = {}
     for file in files:
         fm = parse_frontmatter(file.read_text(encoding="utf-8"))
-        label = group_label(section, fm)
+        group_value = fm.get(section["group_by"])
+        label = resolve_template(
+            section.get("group_label_templates"),
+            section.get("default_group_label_template", "{value}"),
+            group_value,
+            fm,
+        )
         title = fm.get("title", file.parent.name)
         groups.setdefault(label, []).append((title, file.relative_to(REPO_ROOT)))
 
