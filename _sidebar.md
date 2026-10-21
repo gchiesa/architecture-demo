@@ -3,9 +3,9 @@
   - Global
     - [Adopt Trunk-Based Development](ADR/global/adopt-trunk-based-development/README.md)
   - Area: Frontend
-    - [Use GraphQL for Frontend Data Fetching](ADR/frontend/use-graphql-for-frontend-data-fetching/README.md)
+    - [Use GraphQL for Frontend Data Fetching](ADR/area/frontend/use-graphql-for-frontend-data-fetching/README.md)
   - Component: authz
-    - [Use Idempotency Keys for Payment Requests](ADR/authz/use-idempotency-keys-for-payment-requests/README.md)
+    - [Use Idempotency Keys for Payment Requests](ADR/component/authz/use-idempotency-keys-for-payment-requests/README.md)
 - Design Docs
   - Area: Platform
     - [New engineering doc](design-docs/platform/new-engineering-doc/README.md)
