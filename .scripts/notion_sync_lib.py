@@ -23,16 +23,51 @@ def get_title(properties: dict, prop_name: str = "Doc name") -> str:
     return "".join(t["plain_text"] for t in prop.get("title", []))
 
 
-def get_select(properties: dict, prop_name: str) -> str | None:
-    prop = properties.get(prop_name) or {}
-    select = prop.get("select")
-    return select["name"] if select else None
-
-
 def get_status(properties: dict, prop_name: str = "Status") -> str | None:
     prop = properties.get(prop_name) or {}
     status = prop.get("status")
     return status["name"] if status else None
+
+
+def notion_property_name(key: str) -> str:
+    """Convert a snake_case config key (e.g. `target_release`) into the Notion
+    property display name it's expected to match (`Target Release`)."""
+    return key.replace("_", " ").title()
+
+
+def get_property_value(properties: dict, prop_name: str):
+    """Read a Notion property's value regardless of its type, returning a
+    plain Python value (or list) suitable for frontmatter. Returns None for
+    an empty/missing property or an unsupported type."""
+    prop = properties.get(prop_name) or {}
+    prop_type = prop.get("type")
+
+    if prop_type == "title":
+        return "".join(t["plain_text"] for t in prop.get("title", [])) or None
+    if prop_type == "rich_text":
+        return "".join(t["plain_text"] for t in prop.get("rich_text", [])) or None
+    if prop_type == "select":
+        select = prop.get("select")
+        return select["name"] if select else None
+    if prop_type == "multi_select":
+        names = [o["name"] for o in prop.get("multi_select", [])]
+        return names or None
+    if prop_type == "status":
+        status = prop.get("status")
+        return status["name"] if status else None
+    if prop_type == "people":
+        names = [p.get("name") or p.get("id") for p in prop.get("people", [])]
+        return ", ".join(names) or None
+    if prop_type == "date":
+        date = prop.get("date")
+        return date["start"] if date else None
+    if prop_type == "checkbox":
+        return prop.get("checkbox")
+    if prop_type == "number":
+        return prop.get("number")
+    if prop_type in ("url", "email", "phone_number"):
+        return prop.get(prop_type)
+    return None
 
 
 def to_frontmatter(fields: dict) -> str:

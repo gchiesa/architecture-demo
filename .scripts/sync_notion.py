@@ -17,12 +17,13 @@ from notion_sync_lib import (
     REPO_ROOT,
     build_docsify_url,
     fetch_page_markdown,
-    get_select,
+    get_property_value,
     get_status,
     get_title,
     load_sections,
     load_site_base_url,
     localize_images,
+    notion_property_name,
     resolve_template,
     slugify,
     to_frontmatter,
@@ -54,9 +55,12 @@ def query_ready_to_sync(notion: Client, data_source_id: str) -> list[dict]:
 
 
 def build_context(section: dict, properties: dict) -> dict:
-    """Lowercased frontmatter-field values read off a page's Notion properties."""
+    """Frontmatter-field values read off a page's Notion properties, keyed by
+    the snake_case name declared in `frontmatter_properties`. Each entry maps
+    to a Notion property of the same name (e.g. `target_release` ->
+    `Target Release`); the property's type decides how it's extracted."""
     return {
-        prop: get_select(properties, prop.capitalize())
+        prop: get_property_value(properties, notion_property_name(prop))
         for prop in section.get("frontmatter_properties", [])
     }
 

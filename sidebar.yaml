@@ -6,8 +6,14 @@
 #   root                    - folder under the repo root this type is synced into
 #   type                    - value written to each doc's frontmatter `type` field
 #   notion_data_source_env  - env var holding the Notion data source ID to sync from
-#   group_by                - Notion property (lowercased) used to pick a path/label template
-#   frontmatter_properties  - Notion properties (lowercased) copied into each doc's frontmatter
+#   group_by                - snake_case property name (see frontmatter_properties) used to
+#                             pick a path/label template
+#   frontmatter_properties  - snake_case names copied into each doc's frontmatter. Each name
+#                             maps to a Notion property of the Title Case version of the same
+#                             name (e.g. `target_release` -> "Target Release"). The property's
+#                             Notion type decides how it's read (select/status/people/date/...),
+#                             so any supported property type can be exposed this way, not just
+#                             single-word selects.
 #   path_templates          - map of group_by value -> folder-name template
 #   default_path_template   - fallback folder-name template when the value has no entry
 #                             above (omit/null to make an unrecognized value an error)
@@ -51,3 +57,20 @@ sections:
     frontmatter_properties: [area]
     default_path_template: "{value}"
     default_group_label_template: "Area: {value}"
+
+  - key: prd
+    root: PRD
+    label: PRDs
+    type: PRD
+    notion_data_source_env: PRD_DATA_SOURCE_ID
+    group_by: scope
+    frontmatter_properties: [scope, area, component, priority, owner, target_release]
+    path_templates:
+      Global: "global"
+      Area: "{area}"
+      Component: "{component}"
+    group_label_templates:
+      Global: "Global"
+      Area: "Area: {area}"
+      Component: "Component: {component}"
+    default_group_label_template: "Other"
