@@ -90,7 +90,7 @@ def render_page(
     title = get_title(page["properties"])
     full_dest_dir = REPO_ROOT / dest
     full_dest_dir.mkdir(parents=True, exist_ok=True)
-    assets_dir = full_dest_dir / "images"
+    assets_dir = full_dest_dir / "resources"
 
     markdown = fetch_page_markdown(notion_secret, page["id"])
     body = localize_images(markdown, assets_dir)

@@ -156,6 +156,6 @@ def localize_images(markdown: str, assets_dir: Path) -> str:
         ext = Path(urlsplit(url).path).suffix or ".png"
         filename = f"image-{counter[0]}{ext}"
         download_image(url, assets_dir, filename)
-        return f"![{alt}](images/{filename})"
+        return f"![{alt}](resources/{filename})"
 
     return IMAGE_RE.sub(replace, markdown)
