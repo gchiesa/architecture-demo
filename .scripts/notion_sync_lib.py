@@ -195,11 +195,15 @@ def push_page_markdown(notion_secret: str, page_id: str, body: str) -> dict:
         },
         json={
             "type": "replace_content",
-            "new_str": body,
             "markdown_version": "v2",
+            "replace_content": {
+                "new_str": body,
+            },
         },
         timeout=30,
     )
+    if not response.ok:
+        print(f"Notion API error {response.status_code}: {response.text}")
     response.raise_for_status()
     return response.json()
 
