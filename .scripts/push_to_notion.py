@@ -2,6 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "requests>=2.31.0",
+#   "pyyaml>=6.0",
 # ]
 # ///
 """Push a synced doc's body back to its Notion page.
