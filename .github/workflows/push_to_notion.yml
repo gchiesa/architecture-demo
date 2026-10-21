@@ -7,6 +7,11 @@ on:
       - "ADR/**/README.md"
       - "design-docs/**/README.md"
       - "PRD/**/README.md"
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Newline-separated README.md paths to (re)push, e.g. to retry a run that failed before reaching Notion"
+        required: true
 
 jobs:
   push-back:
@@ -28,7 +33,11 @@ jobs:
       - name: Find changed docs
         id: changed
         run: |
-          files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'ADR/**/README.md' 'design-docs/**/README.md' 'PRD/**/README.md')
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            files="${{ inputs.files }}"
+          else
+            files=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- 'ADR/**/README.md' 'design-docs/**/README.md' 'PRD/**/README.md')
+          fi
           echo "files<<EOF" >> "$GITHUB_OUTPUT"
           echo "$files" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
