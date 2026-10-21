@@ -12,3 +12,6 @@
     - [Notion-to-GitHub Docs Sync Pipeline](design-docs/platform/notion-to-github-docs-sync-pipeline/README.md)
   - Area: Frontend
     - [Design System Component Versioning](design-docs/frontend/design-system-component-versioning/README.md)
+- PRDs
+  - Area: Frontend
+    - [Test with Image](PRD/area/frontend/test-with-image/README.md)
