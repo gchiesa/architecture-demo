@@ -8,7 +8,15 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SIDEBAR_CONFIG_PATH = REPO_ROOT / "sidebar.yaml"
 
-IMAGE_RE = re.compile(r"!\[([^\]]*)\]\((https?://[^)\s]+)\)")
+#   - shorthand: ![caption](url)
+#   - tag form (used whenever the block has extra attributes, e.g. color -
+#     this is what Notion's markdown_version "v2" actually emits for images):
+#     <image source="url" ...other attrs.../> or <image source="url" ...>caption</image>
+IMAGE_RE = re.compile(
+    r'!\[(?P<alt1>[^\]]*)\]\((?P<url1>https?://[^)\s]+)\)'
+    r'|<image\s+source="(?P<url2>https?://[^"]+)"[^>]*?(?:/>|>(?P<alt2>.*?)</image>)',
+    re.DOTALL,
+)
 
 NOTION_API_VERSION = "2026-03-11"
 
@@ -151,7 +159,8 @@ def localize_images(markdown: str, assets_dir: Path) -> str:
     counter = [0]
 
     def replace(match: re.Match) -> str:
-        alt, url = match.group(1), match.group(2)
+        url = match.group("url1") or match.group("url2")
+        alt = match.group("alt1") or match.group("alt2") or ""
         counter[0] += 1
         ext = Path(urlsplit(url).path).suffix or ".png"
         filename = f"image-{counter[0]}{ext}"
