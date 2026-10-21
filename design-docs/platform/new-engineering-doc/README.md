@@ -13,6 +13,12 @@ area: "Platform"
 
 High-level description of the technical implementation, architecture decisions, and key components.
 
+```mermaid
+flowchart LR
+    A[GitHub PR merged] --> B[push_to_notion workflow]
+    B --> C[Notion page updated]
+```
+
 <p />
 
 ## 🔧 Technical Details
