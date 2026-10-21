@@ -2,6 +2,8 @@
 - ADR
   - Area: Frontend
     - [Use GraphQL for Frontend Data Fetching](ADR/frontend/use-graphql-for-frontend-data-fetching/README.md)
+  - Component: authz
+    - [Use Idempotency Keys for Payment Requests](ADR/authz/use-idempotency-keys-for-payment-requests/README.md)
   - Component: payment-service
     - [Use Idempotency Keys for Payment Requests](ADR/payment-service/use-idempotency-keys-for-payment-requests/README.md)
   - Global
