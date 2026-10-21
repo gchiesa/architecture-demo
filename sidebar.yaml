@@ -1,0 +1,25 @@
+# Configures the docsify sidebar's top-level sections and how each
+# document's folder is grouped and labeled underneath them.
+#
+# Each section scans `root` for README.md files, groups them by the
+# frontmatter field named in `group_by`, and labels each group using
+# `group_label_templates` (keyed by the group_by field's value) or
+# `default_group_label_template` when the value has no explicit entry.
+# Templates can reference any frontmatter field, e.g. "{area}", plus the
+# special `{value}` placeholder for the raw group_by field value.
+sections:
+  - key: adr
+    root: ADR
+    label: ADR
+    group_by: scope
+    group_label_templates:
+      Global: "Global"
+      Area: "Area: {area}"
+      Component: "Component: {component}"
+    default_group_label_template: "Other"
+
+  - key: design-doc
+    root: design-docs
+    label: Design Docs
+    group_by: area
+    default_group_label_template: "Area: {value}"
