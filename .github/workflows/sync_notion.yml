@@ -18,7 +18,7 @@ jobs:
         with:
           NOTION_SECRET: ${{ secrets.NOTION_SECRET }}
           NOTION_DATABASE: ${{ secrets.NOTION_DATABASE }}
-          FILTER_PROP: Status
+          FILTER_PROP: Sync
           FILTER_VALUES: Ready to Sync
           ARTICLE_PATH: "articles/{title}/README.md"
           ASSETS_PATH: "articles/{title}/images"
