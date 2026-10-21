@@ -1,5 +1,5 @@
-# Drives both the Notion -> GitHub sync routing (scripts/sync_notion.py) and
-# the docsify sidebar generation (scripts/generate_sidebar.py). One section
+# Drives both the Notion -> GitHub sync routing (.scripts/sync_notion.py) and
+# the docsify sidebar generation (.scripts/generate_sidebar.py). One section
 # per document type.
 #
 # Sync fields:

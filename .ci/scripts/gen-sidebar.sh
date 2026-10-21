@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
-uv run scripts/generate_sidebar.py
+uv run .scripts/generate_sidebar.py
