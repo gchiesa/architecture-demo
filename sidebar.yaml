@@ -27,7 +27,7 @@ site_base_url: "https://architecture-demo.g-c.dev"
 sections:
   - key: adr
     root: ADR
-    label: ADR
+    label: ADRs
     type: ADR
     notion_data_source_env: ADR_DATA_SOURCE_ID
     group_by: scope
