@@ -1,11 +1,16 @@
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = [
+#   "pyyaml>=6.0",
+# ]
 # ///
 import re
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_PATH = REPO_ROOT / "sidebar.yaml"
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
@@ -33,47 +38,32 @@ def find_readmes(root: Path) -> list[Path]:
     return sorted(root.rglob("README.md"))
 
 
-def build_adr_section() -> list[str]:
-    files = find_readmes(REPO_ROOT / "ADR")
+def load_sections() -> list[dict]:
+    config = yaml.safe_load(CONFIG_PATH.read_text(encoding="utf-8"))
+    return config["sections"]
+
+
+def group_label(section: dict, fm: dict) -> str:
+    group_by = section["group_by"]
+    value = fm.get(group_by)
+    templates = section.get("group_label_templates") or {}
+    template = templates.get(value, section.get("default_group_label_template", "{value}"))
+    return template.format(value=value, **fm)
+
+
+def build_section(section: dict) -> list[str]:
+    files = find_readmes(REPO_ROOT / section["root"])
     groups: dict[str, list[tuple[str, Path]]] = {}
     for file in files:
         fm = parse_frontmatter(file.read_text(encoding="utf-8"))
-        scope = fm.get("scope")
-        if scope == "Global":
-            label = "Global"
-        elif scope == "Area":
-            label = f"Area: {fm.get('area', 'unknown')}"
-        elif scope == "Component":
-            label = f"Component: {fm.get('component', 'unknown')}"
-        else:
-            label = "Other"
+        label = group_label(section, fm)
         title = fm.get("title", file.parent.name)
         groups.setdefault(label, []).append((title, file.relative_to(REPO_ROOT)))
 
     if not groups:
         return []
 
-    lines = ["- ADR"]
-    for label in sorted(groups):
-        lines.append(f"  - {label}")
-        for title, rel_path in sorted(groups[label]):
-            lines.append(f"    - [{title}]({rel_path.as_posix()})")
-    return lines
-
-
-def build_design_doc_section() -> list[str]:
-    files = find_readmes(REPO_ROOT / "design-docs")
-    groups: dict[str, list[tuple[str, Path]]] = {}
-    for file in files:
-        fm = parse_frontmatter(file.read_text(encoding="utf-8"))
-        label = f"Area: {fm.get('area', 'unknown')}"
-        title = fm.get("title", file.parent.name)
-        groups.setdefault(label, []).append((title, file.relative_to(REPO_ROOT)))
-
-    if not groups:
-        return []
-
-    lines = ["- Design Docs"]
+    lines = [f"- {section['label']}"]
     for label in sorted(groups):
         lines.append(f"  - {label}")
         for title, rel_path in sorted(groups[label]):
@@ -83,8 +73,8 @@ def build_design_doc_section() -> list[str]:
 
 def main() -> None:
     lines = ["- [Home](/)"]
-    lines.extend(build_adr_section())
-    lines.extend(build_design_doc_section())
+    for section in load_sections():
+        lines.extend(build_section(section))
     (REPO_ROOT / "_sidebar.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Wrote _sidebar.md with {len(lines)} lines.")
 
