@@ -1,0 +1,10 @@
+[tools]
+uv = "latest"
+
+[tasks.sync-notion]
+description = "Sync Notion ADR + Design Doc databases to markdown"
+run = "./ci/scripts/sync-notion.sh"
+
+[tasks.gen-sidebar]
+description = "Regenerate docsify _sidebar.md from ADR + Design Doc docs"
+run = "./ci/scripts/gen-sidebar.sh"

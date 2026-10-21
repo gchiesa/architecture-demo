@@ -15,30 +15,18 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Sync Notion to Markdown
-        uses: victornpb/notion-jam@v0.0.13
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup mise
+        uses: jdx/mise-action@v2
+
+      - name: Sync Notion to Markdown (ADR + Design Doc)
+        env:
           NOTION_SECRET: ${{ secrets.NOTION_SECRET }}
-          NOTION_DATABASE: ${{ secrets.NOTION_DATABASE }}
-          FILTER_PROP: Sync
-          FILTER_VALUES: Ready to Sync
-          ARTICLE_PATH: "articles/{title}/README.md"
-          ASSETS_PATH: "articles/{title}/images"
-          PARALLEL_PAGES: 3
-          PARALLEL_DOWNLOADS_PER_PAGE: 3
+          ADR_DATABASE_ID: ${{ secrets.ADR_DATABASE_ID }}
+          DESIGN_DOC_DATABASE_ID: ${{ secrets.DESIGN_DOC_DATABASE_ID }}
+        run: mise run sync-notion
 
       - name: Generate docsify sidebar
-        run: |
-          {
-            echo "- [Home](/)"
-            echo "- Articles"
-            for f in $(find articles -mindepth 2 -maxdepth 2 -name README.md | sort); do
-              title=$(grep -m1 '^title:' "$f" | sed 's/^title:[[:space:]]*//')
-              [ -z "$title" ] && title=$(basename "$(dirname "$f")")
-              echo "  - [$title]($f)"
-            done
-          } > _sidebar.md
+        run: mise run gen-sidebar
 
       - name: Commit and Push Changes
         run: |
