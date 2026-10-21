@@ -14,7 +14,13 @@
 #                             Notion type decides how it's read (select/status/people/date/...),
 #                             so any supported property type can be exposed this way, not just
 #                             single-word selects.
-#   path_templates          - map of group_by value -> folder-name template
+#   path_templates          - map of group_by value -> folder-name template. May contain "/"
+#                             to nest into a subdirectory (e.g. "area/{area}" vs
+#                             "component/{component}") - needed whenever more than one
+#                             group_by value can independently produce the same name
+#                             (e.g. an Area and a Component both named "frontend"), so
+#                             they don't land in the same flat folder and overwrite
+#                             each other.
 #   default_path_template   - fallback folder-name template when the value has no entry
 #                             above (omit/null to make an unrecognized value an error)
 #
@@ -22,6 +28,10 @@
 #   label                   - top-level sidebar heading
 #   group_label_templates   - map of group_by value -> sidebar group label template
 #   default_group_label_template - fallback sidebar group label template
+#   group_order             - optional list of raw group_by values, in the order groups
+#                             should appear (e.g. [Global, Area, Component]). Listed values
+#                             sort first in that order; any other value falls back to
+#                             alphabetical-by-label, same as when group_order is omitted.
 #
 # Templates can reference any frontmatter field, e.g. "{area}", plus the
 # special `{value}` placeholder for the raw group_by value itself.
@@ -40,13 +50,14 @@ sections:
     frontmatter_properties: [scope, area, component]
     path_templates:
       Global: "global"
-      Area: "{area}"
-      Component: "{component}"
+      Area: "area/{area}"
+      Component: "component/{component}"
     group_label_templates:
       Global: "Global"
       Area: "Area: {area}"
       Component: "Component: {component}"
     default_group_label_template: "Other"
+    group_order: [Global, Area, Component]
 
   - key: design-doc
     root: design-docs
@@ -57,6 +68,7 @@ sections:
     frontmatter_properties: [area]
     default_path_template: "{value}"
     default_group_label_template: "Area: {value}"
+    group_order: [Platform, Frontend]
 
   - key: prd
     root: PRD
@@ -67,10 +79,11 @@ sections:
     frontmatter_properties: [scope, area, component, priority, owner, target_release]
     path_templates:
       Global: "global"
-      Area: "{area}"
-      Component: "{component}"
+      Area: "area/{area}"
+      Component: "component/{component}"
     group_label_templates:
       Global: "Global"
       Area: "Area: {area}"
       Component: "Component: {component}"
     default_group_label_template: "Other"
+    group_order: [Global, Area, Component]

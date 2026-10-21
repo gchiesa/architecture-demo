@@ -76,7 +76,12 @@ def dest_dir(section: dict, properties: dict, context: dict) -> Path:
             f"{section['label']} page '{get_title(properties)}' has unrecognized "
             f"{section['group_by']}: {group_value}"
         )
-    return Path(section["root"]) / slugify(segment_template) / slug
+    # Templates may contain "/" to nest into subdirectories (e.g. "area/{area}"
+    # vs "component/{component}", to keep same-named areas and components from
+    # colliding in the same folder) - slugify each segment independently so
+    # the "/" survives as a path separator rather than being collapsed to "-".
+    segments = [slugify(part) for part in segment_template.split("/")]
+    return Path(section["root"], *segments, slug)
 
 
 def render_page(

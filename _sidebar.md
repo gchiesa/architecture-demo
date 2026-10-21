@@ -1,14 +1,14 @@
 - [Home](/)
 - ADRs
+  - Global
+    - [Adopt Trunk-Based Development](ADR/global/adopt-trunk-based-development/README.md)
   - Area: Frontend
     - [Use GraphQL for Frontend Data Fetching](ADR/frontend/use-graphql-for-frontend-data-fetching/README.md)
   - Component: authz
     - [Use Idempotency Keys for Payment Requests](ADR/authz/use-idempotency-keys-for-payment-requests/README.md)
-  - Global
-    - [Adopt Trunk-Based Development](ADR/global/adopt-trunk-based-development/README.md)
 - Design Docs
-  - Area: Frontend
-    - [Design System Component Versioning](design-docs/frontend/design-system-component-versioning/README.md)
   - Area: Platform
     - [New engineering doc](design-docs/platform/new-engineering-doc/README.md)
     - [Notion-to-GitHub Docs Sync Pipeline](design-docs/platform/notion-to-github-docs-sync-pipeline/README.md)
+  - Area: Frontend
+    - [Design System Component Versioning](design-docs/frontend/design-system-component-versioning/README.md)

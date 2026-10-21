@@ -38,6 +38,7 @@ def find_readmes(root: Path) -> list[Path]:
 def build_section(section: dict) -> list[str]:
     files = find_readmes(REPO_ROOT / section["root"])
     groups: dict[str, list[tuple[str, Path]]] = {}
+    labels: dict[str, str] = {}
     for file in files:
         fm = parse_frontmatter(file.read_text(encoding="utf-8"))
         group_value = fm.get(section["group_by"])
@@ -48,15 +49,23 @@ def build_section(section: dict) -> list[str]:
             fm,
         )
         title = fm.get("title", file.parent.name)
-        groups.setdefault(label, []).append((title, file.relative_to(REPO_ROOT)))
+        groups.setdefault(group_value, []).append((title, file.relative_to(REPO_ROOT)))
+        labels[group_value] = label
 
     if not groups:
         return []
 
+    group_order = section.get("group_order")
+
+    def sort_key(group_value: str) -> tuple:
+        if group_order and group_value in group_order:
+            return (0, group_order.index(group_value))
+        return (1, labels[group_value])
+
     lines = [f"- {section['label']}"]
-    for label in sorted(groups):
-        lines.append(f"  - {label}")
-        for title, rel_path in sorted(groups[label]):
+    for group_value in sorted(groups, key=sort_key):
+        lines.append(f"  - {labels[group_value]}")
+        for title, rel_path in sorted(groups[group_value]):
             lines.append(f"    - [{title}]({rel_path.as_posix()})")
     return lines
 
