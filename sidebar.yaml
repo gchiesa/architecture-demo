@@ -26,7 +26,7 @@
 #
 # Sidebar fields:
 #   label                   - top-level sidebar heading
-#   group_label_templates   - map of group_by value -> sidebar group label template
+#   group_label_templates   - I map of group_by value -> sidebar group label template
 #   default_group_label_template - fallback sidebar group label template
 #   group_order             - optional list of raw group_by values, in the order groups
 #                             should appear (e.g. [Global, Area, Component]). Listed values
