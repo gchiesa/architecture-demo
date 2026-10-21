@@ -1,5 +1,5 @@
 - [Home](/)
-- ADR
+- ADRs
   - Area: Frontend
     - [Use GraphQL for Frontend Data Fetching](ADR/frontend/use-graphql-for-frontend-data-fetching/README.md)
   - Component: authz
