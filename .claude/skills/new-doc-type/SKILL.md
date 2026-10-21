@@ -88,7 +88,7 @@ user listed, is fine and saves a step).
 The tool result includes a `<data-source url="{{collection://<uuid>}}">`
 block — that `collection://<uuid>` is the ID you need next.
 
-## Step 6 — Add the GitHub secret
+## Step 6 — Add the GitHub secret and wire the workflow
 
 Tell the user the new data source ID and the secret name it needs
 (`<TYPE_IN_SCREAMING_SNAKE>_DATA_SOURCE_ID`, e.g. `RFC_DATA_SOURCE_ID`). Ask
@@ -98,6 +98,12 @@ confirm, run:
 ```bash
 gh secret set RFC_DATA_SOURCE_ID --body "<the collection:// uuid, no prefix>"
 ```
+
+Setting the secret alone is not enough — `.github/workflows/sync_notion.yml`
+only forwards secrets it explicitly lists under the sync step's `env:`. Add
+the new one there too (and update the step name's doc-type list), or the
+workflow will fail with `Missing required env var ..._DATA_SOURCE_ID` even
+though the secret exists.
 
 ## Step 7 — Wire it into `sidebar.yaml`
 

@@ -18,11 +18,12 @@ jobs:
       - name: Setup mise
         uses: jdx/mise-action@v2
 
-      - name: Sync Notion to Markdown (ADR + Design Doc)
+      - name: Sync Notion to Markdown (ADR + Design Doc + PRD)
         env:
           NOTION_SECRET: ${{ secrets.NOTION_SECRET }}
           ADR_DATA_SOURCE_ID: ${{ secrets.ADR_DATA_SOURCE_ID }}
           DESIGN_DOC_DATA_SOURCE_ID: ${{ secrets.DESIGN_DOC_DATA_SOURCE_ID }}
+          PRD_DATA_SOURCE_ID: ${{ secrets.PRD_DATA_SOURCE_ID }}
         run: mise run sync-notion
 
       - name: Generate docsify sidebar
