@@ -6,9 +6,9 @@ created_time: "2026-10-21T09:47:00.000Z"
 last_edited_time: "2026-10-21T16:12:00.000Z"
 notion_url: "https://app.notion.com/p/New-engineering-doc-40096cd65ae081c29356eda8e69738bf"
 docsify_url: "https://architecture-demo.g-c.dev/#/design-docs/platform/new-engineering-doc/README"
+content_hash: "f959ae222075e25467045a66167fa8831bf8a9ea360a7e2b955e99adf19526f9"
 type: "Design Doc"
 area: "Platform"
-content_hash: "f959ae222075e25467045a66167fa8831bf8a9ea360a7e2b955e99adf19526f9"
 ---
 ## 🎯 Overview
 

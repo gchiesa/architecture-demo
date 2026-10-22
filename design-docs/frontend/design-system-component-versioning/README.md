@@ -3,9 +3,10 @@ id: "40096cd6-5ae0-8101-adaa-fbb1806f2cf1"
 title: "Design System Component Versioning"
 status: "Published"
 created_time: "2026-10-21T11:08:00.000Z"
-last_edited_time: "2026-10-21T11:08:00.000Z"
+last_edited_time: "2026-10-21T15:47:00.000Z"
 notion_url: "https://app.notion.com/p/Design-System-Component-Versioning-40096cd65ae08101adaafbb1806f2cf1"
 docsify_url: "https://architecture-demo.g-c.dev/#/design-docs/frontend/design-system-component-versioning/README"
+content_hash: "3d16a71e57e37054fbde1261baab9090f2fb9f9a09ce2d618964cb0a591792c4"
 type: "Design Doc"
 area: "Frontend"
 ---
@@ -18,6 +19,13 @@ Frontend teams consume a shared component library that currently ships as a sing
 - Allow component library changes to ship without forcing every consuming app to upgrade simultaneously.
 - Give consuming teams a predictable upgrade path and changelog.
 - Keep the number of actively supported versions small.
+
+<p />
+
+```mermaid
+graph TD
+  Mermaid --> Diagram
+```
 
 ## Design
 
