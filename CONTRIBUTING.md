@@ -1,15 +1,18 @@
 # Contributing / repo tooling
 
 This file is for people working on the sync pipeline itself, not for the
-docsify-rendered documentation (see `README.md` / the live site for that).
+VitePress-rendered documentation (see `README.md` / the live site for that).
 
 ## Layout
 
-- `.scripts/` — Python sync/sidebar scripts (run via `uv`, PEP 723 inline deps)
+- `.scripts/` — Python sync scripts (run via `uv`, PEP 723 inline deps)
 - `.ci/scripts/` — thin shell wrappers invoked by `mise` tasks
-- `mise.toml` — `mise run sync-notion`, `mise run gen-sidebar`
+- `.vitepress/` — VitePress config, theme, and the sidebar builder
+  (`sidebar.mjs`) that replaces the old `generate_sidebar.py`
+- `mise.toml` — `mise run sync-notion`, `mise run gen-sidebar`,
+  `mise run docs-build` / `docs-dev` / `docs-preview`
 - `sidebar.yaml` — single source of config for both the sync routing and the
-  docsify sidebar; see the comments at the top of the file
+  VitePress sidebar; see the comments at the top of the file
 
 The leading dots on `.scripts/` and `.ci/` are intentional: everything else at
 the repo root is actual documentation content (`ADR/`, `design-docs/`, ...),

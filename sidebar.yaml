@@ -1,6 +1,7 @@
 # Drives both the Notion -> GitHub sync routing (.scripts/sync_notion.py) and
-# the docsify sidebar generation (.scripts/generate_sidebar.py). One section
-# per document type.
+# the VitePress sidebar, which is computed at build time from this file plus
+# each synced doc's frontmatter (.vitepress/sidebar.mjs). One section per
+# document type.
 #
 # Sync fields:
 #   root                    - folder under the repo root this type is synced into
@@ -36,8 +37,8 @@
 # Templates can reference any frontmatter field, e.g. "{area}", plus the
 # special `{value}` placeholder for the raw group_by value itself.
 #
-# site_base_url is the live docsify site's origin, used to build each doc's
-# `docsify_url` frontmatter field (hash-routed to that doc's README).
+# site_base_url is the live VitePress site's origin, used to build each doc's
+# `doc_url` frontmatter field (the doc's clean, directory-style URL).
 site_base_url: "https://architecture-demo.g-c.dev"
 
 sections:

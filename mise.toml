@@ -1,14 +1,27 @@
 [tools]
 uv = "latest"
+node = "lts"
 
 [tasks.sync-notion]
 description = "Sync Notion ADR + Design Doc databases to markdown"
 run = "./.ci/scripts/sync-notion.sh"
 
 [tasks.gen-sidebar]
-description = "Regenerate docsify _sidebar.md from ADR + Design Doc docs"
+description = "Print the VitePress sidebar computed from sidebar.yaml + docs (sanity check only, not a build step)"
 run = "./.ci/scripts/gen-sidebar.sh"
 
 [tasks.push-to-notion]
 description = "Push changed synced docs' bodies back to their Notion pages"
 run = "./.ci/scripts/push-to-notion.sh"
+
+[tasks.docs-dev]
+description = "Run the VitePress dev server"
+run = "./.ci/scripts/docs-dev.sh"
+
+[tasks.docs-build]
+description = "Build the static VitePress site into .vitepress/dist"
+run = "./.ci/scripts/docs-build.sh"
+
+[tasks.docs-preview]
+description = "Preview the built VitePress site"
+run = "./.ci/scripts/docs-preview.sh"

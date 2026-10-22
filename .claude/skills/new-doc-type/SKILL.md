@@ -6,10 +6,11 @@ description: Bootstrap a new Notion-authored document type for this repo (like A
 # Adding a new document type
 
 This repo syncs Notion databases into this git repo as markdown, rendered by
-docsify. Each document *type* (ADR, Design Doc, ...) is one Notion database
+VitePress. Each document *type* (ADR, Design Doc, ...) is one Notion database
 plus one entry in `sidebar.yaml` that tells `.scripts/sync_notion.py` how to
-route synced pages into folders and `.scripts/generate_sidebar.py` how to
-group them in the sidebar. This skill adds a new one end to end.
+route synced pages into folders and `.vitepress/sidebar.mjs` how to group
+them in the sidebar (computed at build time, not a static file). This skill
+adds a new one end to end.
 
 Read `sidebar.yaml`'s header comment first — it documents every field this
 skill writes. Read `CONTRIBUTING.md` for the MCP/auth setup this skill
@@ -113,8 +114,8 @@ regenerate the whole file programmatically, that would destroy the existing
 comments. Match the style of the existing `adr`/`design-doc` entries exactly.
 
 After editing, run `mise run gen-sidebar` to confirm the YAML parses and the
-sidebar regenerates without error (it's expected to show zero new entries
-for this type, since nothing has synced yet).
+sidebar computes without error (it's expected to show zero new entries for
+this type, since nothing has synced yet).
 
 ## Step 8 — The Notion "ready to sync" automation
 

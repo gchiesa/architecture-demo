@@ -27,8 +27,10 @@ jobs:
           PRD_DATA_SOURCE_ID: ${{ secrets.PRD_DATA_SOURCE_ID }}
         run: mise run sync-notion
 
-      - name: Generate docsify sidebar
-        run: mise run gen-sidebar
+      # The VitePress sidebar is computed from sidebar.yaml + doc frontmatter
+      # at build time (.vitepress/sidebar.mjs), so there's nothing to
+      # regenerate here - merging to main is enough; deploy_docs.yml rebuilds
+      # and redeploys the site on every push to main.
 
       # main is protected (no direct pushes) - open a PR with the synced
       # changes instead. It still needs an approval from an identity other

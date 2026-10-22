@@ -15,7 +15,7 @@ from notion_client import Client
 
 from notion_sync_lib import (
     REPO_ROOT,
-    build_docsify_url,
+    build_doc_url,
     content_hash,
     fetch_page_markdown,
     get_property_value,
@@ -104,7 +104,7 @@ def render_page(
             "created_time": page["created_time"],
             "last_edited_time": page["last_edited_time"],
             "notion_url": page["url"],
-            "docsify_url": build_docsify_url(site_base_url, dest),
+            "doc_url": build_doc_url(site_base_url, dest),
             "content_hash": content_hash(body),
             **extra_frontmatter,
         }

@@ -1,0 +1,7 @@
+/* Keep the docsify site's theme color (#42b883) for visual continuity. */
+:root {
+  --vp-c-brand-1: #42b883;
+  --vp-c-brand-2: #3aa876;
+  --vp-c-brand-3: #33996a;
+  --vp-c-brand-soft: rgba(66, 184, 131, 0.14);
+}

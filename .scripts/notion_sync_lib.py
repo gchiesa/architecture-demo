@@ -110,8 +110,10 @@ def load_site_base_url() -> str:
     return load_config()["site_base_url"].rstrip("/")
 
 
-def build_docsify_url(site_base_url: str, dest_dir: Path) -> str:
-    return f"{site_base_url}/#/{(dest_dir / 'README').as_posix()}"
+def build_doc_url(site_base_url: str, dest_dir: Path) -> str:
+    """VitePress gives `<dir>/README.md` a clean URL at `<dir>/` (README.md
+    is treated like index.md for routing purposes)."""
+    return f"{site_base_url}/{dest_dir.as_posix()}/"
 
 
 class _DefaultingDict(dict):
