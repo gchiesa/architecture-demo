@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,14 +30,45 @@ jobs:
       - name: Generate docsify sidebar
         run: mise run gen-sidebar
 
-      - name: Commit and Push Changes
+      # main is protected (no direct pushes) - open a PR with the synced
+      # changes instead. It still needs an approval from an identity other
+      # than the PR author (github-actions[bot] here), since GitHub blocks
+      # self-approval - see the Approve PR step below.
+      - name: Open PR with synced changes
+        id: open_pr
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           if git diff --staged --quiet; then
             echo "No new changes to commit"
-          else
-            git commit -m "Auto-sync articles from Notion"
-            git push
+            echo "pr_number=" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          branch="automated/sync-notion-${{ github.run_id }}-${{ github.run_attempt }}"
+          git checkout -b "$branch"
+          git commit -m "Auto-sync articles from Notion"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "Auto-sync articles from Notion" \
+            --body "Automated content sync from Notion. No manual content changes - approved and merged automatically."
+          number=$(gh pr list --head "$branch" --json number -q '.[0].number')
+          echo "pr_number=$number" >> "$GITHUB_OUTPUT"
+
+      # Today: a PAT belonging to the repo admin, used only to approve -
+      # never to push code directly. In an org, swap this for a dedicated
+      # GitHub App installation token (e.g. actions/create-github-app-token)
+      # by changing only the GH_TOKEN value below; nothing else changes.
+      - name: Approve PR
+        if: steps.open_pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.PR_APPROVER_TOKEN }}
+        run: gh pr review ${{ steps.open_pr.outputs.pr_number }} --approve --body "Automated approval - routine Notion content sync."
+
+      - name: Merge PR
+        if: steps.open_pr.outputs.pr_number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr merge ${{ steps.open_pr.outputs.pr_number }} --merge --delete-branch
