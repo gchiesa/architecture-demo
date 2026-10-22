@@ -29,6 +29,36 @@
       border-radius: 1em;
       text-decoration: none;
     }
+    table.frontmatter-meta {
+      float: right;
+      margin: 0 0 1em 1.5em;
+      font-size: 0.75em;
+      border-collapse: collapse;
+    }
+    table.frontmatter-meta th,
+    table.frontmatter-meta td {
+      border: 1px solid var(--theme-color, #42b883);
+      padding: 0.25em 0.6em;
+      text-align: left;
+      white-space: nowrap;
+    }
+    table.frontmatter-meta th {
+      font-weight: 600;
+      background: rgba(66, 184, 131, 0.08);
+    }
+    .markdown-section::after {
+      content: '';
+      display: block;
+      clear: both;
+    }
+    .sidebar-nav li > a,
+    .sidebar-nav li > p {
+      cursor: pointer;
+    }
+    .sidebar-nav li > a:hover,
+    .sidebar-nav li > p:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -53,22 +83,44 @@
       },
       plugins: [
         function frontmatterAndNotionEditLink(hook) {
+          const HIDDEN_KEYS = ['id', 'title', 'notion_url', 'docsify_url', 'content_hash'];
           let notionUrl = null;
+          let meta = null;
           hook.beforeEach(function (markdown) {
             const match = markdown.match(/^---\n([\s\S]*?)\n---\n/);
             notionUrl = null;
+            meta = null;
             if (match) {
-              const urlMatch = match[1].match(/^notion_url:\s*"([^"]*)"/m);
-              if (urlMatch) notionUrl = urlMatch[1];
+              meta = {};
+              match[1].split('\n').forEach(function (line) {
+                const kv = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
+                if (!kv) return;
+                let value = kv[2].trim();
+                if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+                const dateMatch = value.match(/^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}/);
+                if (dateMatch) value = dateMatch[1];
+                meta[kv[1]] = value;
+              });
+              if (meta.notion_url) notionUrl = meta.notion_url;
             }
             return markdown.replace(/^---\n[\s\S]*?\n---\n/, '');
           });
           hook.afterEach(function (html) {
-            if (!notionUrl) return html;
-            return (
-              `<p class="notion-edit-link"><a href="${notionUrl}" target="_blank" rel="noopener">✏️ Edit in Notion</a></p>` +
-              html
-            );
+            let out = html;
+            if (meta) {
+              const rows = Object.keys(meta)
+                .filter(function (key) { return HIDDEN_KEYS.indexOf(key) === -1 && meta[key]; })
+                .map(function (key) {
+                  const label = key.replace(/_/g, ' ');
+                  return `<tr><th>${label}</th><td>${meta[key]}</td></tr>`;
+                })
+                .join('');
+              if (rows) out = `<table class="frontmatter-meta">${rows}</table>` + out;
+            }
+            if (notionUrl) {
+              out = `<p class="notion-edit-link"><a href="${notionUrl}" target="_blank" rel="noopener">✏️ Edit in Notion</a></p>` + out;
+            }
+            return out;
           });
         },
       ],
