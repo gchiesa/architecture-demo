@@ -10,8 +10,10 @@
 Runs on every push to main that touches a synced README.md (see
 .github/workflows/push_to_notion.yml). This is the GitHub -> Notion half of
 the sync; .scripts/sync_notion.py is the Notion -> GitHub half. Scope for
-now: body only (frontmatter/properties stay Notion-authoritative), and docs
-with local images are skipped (no public URL to hand back to Notion yet).
+now: body only - frontmatter/properties stay Notion-authoritative, and docs
+with local images are skipped (no safe way to hand Notion a URL it can
+fetch that also works for a private repo), surfaced as a GitHub Actions
+warning annotation rather than just a log line.
 """
 import os
 import re
@@ -50,6 +52,16 @@ def set_frontmatter_field(raw: str, key: str, value: str) -> str:
     return re.sub(r"\n---\n", f"\n{line}\n---\n", raw, count=1)
 
 
+def warn(path: Path, message: str) -> None:
+    """Emit a GitHub Actions warning annotation (shows up on the run summary
+    and the diff, not just buried in the step log), falling back to a plain
+    print outside of Actions."""
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::warning file={path}::{message}")
+    else:
+        print(f"WARNING {path}: {message}")
+
+
 def process_file(path: Path, notion_secret: str) -> None:
     raw = path.read_text(encoding="utf-8")
     fields, body = parse_file(raw)
@@ -60,7 +72,7 @@ def process_file(path: Path, notion_secret: str) -> None:
         return
 
     if "resources/" in body:
-        print(f"Skip {path}: contains local images, push-back of images isn't supported yet")
+        warn(path, "contains local image(s) - push-back of images to Notion isn't supported, skipping body sync")
         return
 
     new_hash = content_hash(body)
@@ -70,15 +82,16 @@ def process_file(path: Path, notion_secret: str) -> None:
 
     page = get_page(notion_secret, page_id)
     if page["last_edited_time"] != fields.get("last_edited_time"):
-        print(
-            f"Skip {path}: Notion page was edited ({page['last_edited_time']}) "
-            f"since the last pull ({fields.get('last_edited_time')}) - resolve manually"
+        warn(
+            path,
+            f"Notion page was edited ({page['last_edited_time']}) since the last pull "
+            f"({fields.get('last_edited_time')}) - skipping to avoid overwriting it, resolve manually",
         )
         return
 
     result = push_page_markdown(notion_secret, page_id, body)
-    for warning in result.get("warnings", []):
-        print(f"Warning for {path}: {warning}")
+    for notion_warning in result.get("warnings", []):
+        warn(path, f"Notion API warning: {notion_warning}")
 
     updated_page = get_page(notion_secret, page_id)
     raw = set_frontmatter_field(raw, "content_hash", new_hash)
