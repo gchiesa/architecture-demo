@@ -2,6 +2,8 @@
 
 This file is for people working on the sync pipeline itself, not for the
 VitePress-rendered documentation (see `README.md` / the live site for that).
+For how the pipeline fits together end to end — Notion authoring, the
+GitHub sync and push-back workflows, the site build — see `CLAUDE.md`.
 
 ## Layout
 

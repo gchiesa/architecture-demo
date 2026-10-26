@@ -17,6 +17,7 @@ from notion_sync_lib import (
     REPO_ROOT,
     build_doc_url,
     content_hash,
+    fetch_page_headings,
     fetch_page_markdown,
     get_property_value,
     get_status,
@@ -26,6 +27,7 @@ from notion_sync_lib import (
     localize_images,
     notion_property_name,
     resolve_template,
+    rewrite_notion_links_to_repo,
     slugify,
     to_frontmatter,
 )
@@ -85,16 +87,42 @@ def dest_dir(section: dict, properties: dict, context: dict) -> Path:
     return Path(section["root"], *segments, slug)
 
 
-def render_page(
-    notion_secret: str, page: dict, dest: Path, extra_frontmatter: dict, site_base_url: str
-) -> None:
+def fetch_section_pages(notion: Client, notion_secret: str, section: dict) -> list[dict]:
+    """Pass 1 for one section: query Ready-to-Sync pages and fetch each
+    one's raw markdown + heading map, without writing or rewriting links
+    yet - that needs the full cross-section registry, built after every
+    section has been fetched (see `main`)."""
+    data_source_id = require_env(section["notion_data_source_env"])
+    pages = query_ready_to_sync(notion, data_source_id)
+    fetched = []
+    for page in pages:
+        context = build_context(section, page["properties"])
+        dest = dest_dir(section, page["properties"], context)
+        fetched.append(
+            {
+                "page": page,
+                "page_id": page["id"].replace("-", ""),
+                "section": section,
+                "dest": dest,
+                "context": context,
+                "markdown": fetch_page_markdown(notion_secret, page["id"]),
+                "headings": fetch_page_headings(notion_secret, page["id"]),
+            }
+        )
+    return fetched
+
+
+def render_page(entry: dict, site_base_url: str, registry: dict[str, dict]) -> None:
+    page = entry["page"]
+    dest = entry["dest"]
     title = get_title(page["properties"])
     full_dest_dir = REPO_ROOT / dest
     full_dest_dir.mkdir(parents=True, exist_ok=True)
     assets_dir = full_dest_dir / "resources"
+    doc_url = build_doc_url(site_base_url, dest)
 
-    markdown = fetch_page_markdown(notion_secret, page["id"])
-    body = localize_images(markdown, assets_dir)
+    body = rewrite_notion_links_to_repo(entry["markdown"], entry["page_id"], dest, doc_url, registry)
+    body = localize_images(body, assets_dir)
 
     frontmatter = to_frontmatter(
         {
@@ -104,26 +132,15 @@ def render_page(
             "created_time": page["created_time"],
             "last_edited_time": page["last_edited_time"],
             "notion_url": page["url"],
-            "doc_url": build_doc_url(site_base_url, dest),
+            "doc_url": doc_url,
             "content_hash": content_hash(body),
-            **extra_frontmatter,
+            "type": entry["section"]["type"],
+            **entry["context"],
         }
     )
 
     (full_dest_dir / "README.md").write_text(frontmatter + body, encoding="utf-8")
     print(f'Synced "{title}" -> {dest}/README.md')
-
-
-def sync_section(notion: Client, notion_secret: str, section: dict, site_base_url: str) -> list[Path]:
-    data_source_id = require_env(section["notion_data_source_env"])
-    pages = query_ready_to_sync(notion, data_source_id)
-    dest_dirs = []
-    for page in pages:
-        context = build_context(section, page["properties"])
-        dest = dest_dir(section, page["properties"], context)
-        render_page(notion_secret, page, dest, {"type": section["type"], **context}, site_base_url)
-        dest_dirs.append(dest)
-    return dest_dirs
 
 
 def remove_stale_docs(root: Path, expected_dirs: set[Path]) -> int:
@@ -155,9 +172,33 @@ def main() -> None:
     notion_secret = require_env("NOTION_SECRET")
     notion = Client(auth=notion_secret)
     site_base_url = load_site_base_url()
+    sections = load_sections()
 
-    for section in load_sections():
-        dest_dirs = sync_section(notion, notion_secret, section, site_base_url)
+    # Pass 1: fetch every Ready-to-Sync page across all sections first, so
+    # the link registry below reflects the full current set before any
+    # page's links get rewritten - a page in one section may link to a page
+    # in another, or be processed before/after the page it links to.
+    all_fetched = []
+    for section in sections:
+        all_fetched.extend(fetch_section_pages(notion, notion_secret, section))
+
+    registry = {
+        entry["page_id"]: {
+            "dest_dir": entry["dest"],
+            "doc_url": build_doc_url(site_base_url, entry["dest"]),
+            "headings": entry["headings"],
+        }
+        for entry in all_fetched
+    }
+
+    # Pass 2: rewrite links against the complete registry and write files.
+    dest_dirs_by_section: dict[str, list[Path]] = {}
+    for entry in all_fetched:
+        render_page(entry, site_base_url, registry)
+        dest_dirs_by_section.setdefault(entry["section"]["key"], []).append(entry["dest"])
+
+    for section in sections:
+        dest_dirs = dest_dirs_by_section.get(section["key"], [])
         removed = remove_stale_docs(Path(section["root"]), set(dest_dirs))
         print(f"{section['label']}: {len(dest_dirs)} synced, {removed} stale removed.")
 

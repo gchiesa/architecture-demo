@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -20,6 +21,31 @@ IMAGE_RE = re.compile(
 )
 
 NOTION_API_VERSION = "2026-03-11"
+
+# Notion's Markdown Content API renders an internal link to another page (or
+# to a block within a page) as a page-relative path - confirmed empirically
+# via a live round-trip, e.g. `/p/40096cd65ae081839f16d9f6e5f55c6a?pvs=25` or
+# `/p/<page-id>?v=...&pvs=25#<block-id>` for a link into a specific section.
+# No host, no scheme - a host prefix is tolerated below in case some other
+# Notion surface ever emits one, but the bare form is what actually occurs.
+NOTION_INTERNAL_LINK_RE = re.compile(
+    r"\[(?P<text>[^\]]*)\]\("
+    r"(?:https?://(?:www\.notion\.so|app\.notion\.com))?"
+    r"/p/(?P<page_id>[0-9a-f]{32})"
+    r"(?:\?[^)\s#]*)?"
+    r"(?:#(?P<block_id>[0-9a-f]{32}))?"
+    r"\)"
+)
+
+# An ordinary markdown link (not an image - `(?<!!)` excludes `![...](...)`),
+# used by the GitHub -> Notion push-back direction to find links authored in
+# the repo (relative paths to another doc, or `#anchor` fragments) that need
+# converting back into Notion's own link form before being pushed.
+MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[(?P<text>[^\]]*)\]\((?P<href>[^)\s]+)\)")
+
+HEADING_BLOCK_TYPES = {"heading_1", "heading_2", "heading_3"}
+
+FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
 
 
 def slugify(value: str) -> str:
@@ -96,6 +122,23 @@ def to_frontmatter(fields: dict) -> str:
     lines.append("---")
     lines.append("")
     return "\n".join(lines)
+
+
+def parse_frontmatter(raw: str) -> tuple[dict[str, str], str]:
+    match = FRONTMATTER_RE.match(raw)
+    if not match:
+        return {}, raw
+    fields: dict[str, str] = {}
+    for line in match.group(1).splitlines():
+        if ":" not in line:
+            continue
+        key, _, raw_value = line.partition(":")
+        key = key.strip()
+        raw_value = raw_value.strip()
+        if raw_value.startswith('"') and raw_value.endswith('"'):
+            raw_value = raw_value[1:-1]
+        fields[key] = raw_value
+    return fields, match.group(2)
 
 
 def load_config() -> dict:
@@ -208,6 +251,231 @@ def push_page_markdown(notion_secret: str, page_id: str, body: str) -> dict:
         print(f"Notion API error {response.status_code}: {response.text}")
     response.raise_for_status()
     return response.json()
+
+
+def slugify_heading(text: str) -> str:
+    """Approximates VitePress's heading anchor slug (markdown-it-anchor's
+    default: lowercase, strip punctuation, spaces to hyphens). Dedup across
+    a page's headings is handled by the caller (`fetch_page_headings`), not
+    here, since it needs the full page's heading order."""
+    slug = re.sub(r"<[^>]+>", "", text).strip().lower()
+    slug = re.sub(r"[^\w\s-]", "", slug)
+    slug = re.sub(r"[\s_]+", "-", slug).strip("-")
+    return slug or "section"
+
+
+def notion_page_url(page_id: str, block_id: str | None = None) -> str:
+    """Absolute fallback link for a Notion page/block with no resolvable
+    repo-local mirror - always a working Notion deep link. Deliberately NOT
+    the bare `/p/...` path Notion's own API emits: that form has no host, so
+    left as-is it would be broken the moment it's viewed outside Notion's
+    app (on GitHub's file render or the built site)."""
+    url = f"https://app.notion.com/p/{page_id}"
+    return f"{url}#{block_id}" if block_id else url
+
+
+def notion_internal_link(page_id: str, block_id: str | None = None) -> str:
+    """The relative `/p/<id>[#<block>]` link form Notion's Markdown Content
+    API itself emits (confirmed via a live round-trip) - used when pushing a
+    link back into Notion, which is the form it already understands."""
+    href = f"/p/{page_id}"
+    return f"{href}#{block_id}" if block_id else href
+
+
+def fetch_page_headings(notion_secret: str, page_id: str) -> dict[str, str]:
+    """Walks a page's block tree and returns {heading_block_id: anchor_slug}.
+    The flat Markdown Content API has no block ids in its output, so a
+    link's `#<block_id>` fragment can only be resolved to a heading's text
+    (and from there, its anchor slug) via the separate Blocks API."""
+    import requests
+
+    headings: list[tuple[str, str]] = []
+
+    def walk(block_id: str, cursor: str | None = None) -> None:
+        response = requests.get(
+            f"https://api.notion.com/v1/blocks/{block_id}/children",
+            headers={
+                "Authorization": f"Bearer {notion_secret}",
+                "Notion-Version": NOTION_API_VERSION,
+            },
+            params={"start_cursor": cursor} if cursor else {},
+            timeout=30,
+        )
+        response.raise_for_status()
+        data = response.json()
+        for block in data["results"]:
+            block_type = block["type"]
+            if block_type in HEADING_BLOCK_TYPES:
+                text = _rich_text_plain(block[block_type].get("rich_text", []))
+                headings.append((block["id"].replace("-", ""), text))
+            if block.get("has_children"):
+                walk(block["id"])
+        if data.get("has_more"):
+            walk(block_id, data["next_cursor"])
+
+    walk(page_id)
+
+    slugs: dict[str, str] = {}
+    seen: dict[str, int] = {}
+    for block_id, text in headings:
+        base = slugify_heading(text)
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        slugs[block_id] = base if count == 0 else f"{base}-{count}"
+    return slugs
+
+
+def _rich_text_plain(rich_text: list[dict]) -> str:
+    return "".join(t.get("plain_text", "") for t in rich_text)
+
+
+def build_dest_relative_link(current_dir: Path, target_dir: Path, anchor: str | None) -> str:
+    rel = Path(os.path.relpath(target_dir, start=current_dir))
+    href = "README.md" if rel == Path(".") else f"{rel.as_posix()}/README.md"
+    return f"{href}#{anchor}" if anchor else href
+
+
+def rewrite_notion_links_to_repo(
+    markdown: str,
+    current_page_id: str,
+    current_dest_dir: Path,
+    current_doc_url: str,
+    registry: dict[str, dict],
+) -> str:
+    """Rewrites Notion's internal `/p/<id>[#<block>]` links into relative
+    repo links wherever the target is also synced this run, falling back to
+    an absolute Notion URL for anything it can't resolve (unsynced/deleted
+    target page, or a link to a non-heading block) - see the link-sync plan
+    for the full rationale. `registry` maps a (dashless) Notion page id to
+    `{dest_dir, doc_url, headings}` for every page synced this run."""
+
+    def replace(match: re.Match) -> str:
+        text = match.group("text")
+        page_id = match.group("page_id")
+        block_id = match.group("block_id")
+
+        entry = registry.get(page_id)
+        if entry is None:
+            return f"[{text}]({notion_page_url(page_id, block_id)})"
+
+        anchor = None
+        if block_id:
+            anchor = entry["headings"].get(block_id)
+            if anchor is None:
+                print(
+                    f"Warning: link to {page_id}#{block_id} has no matching heading "
+                    "in the synced doc, linking to the page instead"
+                )
+
+        if page_id == current_page_id:
+            href = f"#{anchor}" if anchor else current_doc_url
+        else:
+            href = build_dest_relative_link(current_dest_dir, entry["dest_dir"], anchor)
+        return f"[{text}]({href})"
+
+    return NOTION_INTERNAL_LINK_RE.sub(replace, markdown)
+
+
+def scan_local_doc_registry(roots: list[str]) -> dict[str, str]:
+    """Maps each synced doc's repo-relative directory (posix str) to its
+    Notion page id (dashless), read straight off frontmatter on disk - no
+    Notion API calls needed, since every synced doc already carries its own
+    `id`. Used by the GitHub -> Notion push-back direction to resolve a
+    relative link in the repo to the Notion page it should point at."""
+    registry: dict[str, str] = {}
+    for root in roots:
+        root_path = REPO_ROOT / root
+        if not root_path.exists():
+            continue
+        for readme in root_path.rglob("README.md"):
+            fields, _ = parse_frontmatter(readme.read_text(encoding="utf-8"))
+            page_id = fields.get("id")
+            if not page_id:
+                continue
+            rel_dir = readme.parent.relative_to(REPO_ROOT).as_posix()
+            registry[rel_dir] = page_id.replace("-", "")
+    return registry
+
+
+def resolve_repo_link_target(
+    href: str, current_dir: Path, local_registry: dict[str, str]
+) -> tuple[str | None, str | None, bool]:
+    """Classifies a markdown link's href found in a repo doc for the push-back
+    direction. Returns `(target_page_id, anchor, recognized)`:
+    - `recognized=False` means this isn't a doc link in scope for this
+      feature (external URL, already a Notion-native `/p/...` link, or a
+      relative path to something other than another doc's `README.md`) -
+      the caller must leave it untouched.
+    - `recognized=True` with `target_page_id=None` means a bare `#anchor`
+      (same-page link) - the caller resolves it against the current page.
+    - `recognized=True` with `target_page_id=None` and `anchor=None` *and*
+      the href was a non-empty, resolvable `README.md` path not in the
+      registry means the target doc isn't currently synced - handled by the
+      caller as "unresolved internal".
+    """
+    path_part, _, fragment = href.partition("#")
+    anchor = fragment or None
+
+    if path_part == "":
+        return None, anchor, True  # pure `#anchor`
+
+    if path_part.startswith(("http://", "https://", "/p/")):
+        return None, None, False  # external, or already Notion-native
+
+    target_path = (current_dir / path_part).resolve()
+    if target_path.name != "README.md":
+        return None, None, False
+    try:
+        rel_dir = target_path.parent.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return None, None, False
+
+    page_id = local_registry.get(rel_dir)
+    if page_id is None:
+        return "unresolved", anchor, True
+    return page_id, anchor, True
+
+
+def rewrite_repo_links_to_notion(
+    markdown: str,
+    current_page_id: str,
+    current_dir: Path,
+    local_registry: dict[str, str],
+    notion_secret: str,
+) -> str:
+    """Rewrites repo-relative doc links and `#anchor` fragments back into
+    Notion's own `/p/<id>[#<block>]` link form before a push, the mirror of
+    `rewrite_notion_links_to_repo`. `current_page_id` and registry values are
+    dashless Notion page ids."""
+    heading_cache: dict[str, dict[str, str]] = {}
+
+    def slug_to_block_id(page_id: str, slug: str) -> str | None:
+        if page_id not in heading_cache:
+            heading_cache[page_id] = fetch_page_headings(notion_secret, page_id)
+        for block_id, s in heading_cache[page_id].items():
+            if s == slug:
+                return block_id
+        return None
+
+    def replace(match: re.Match) -> str:
+        text, href = match.group("text"), match.group("href")
+        target_id, anchor, recognized = resolve_repo_link_target(href, current_dir, local_registry)
+        if not recognized:
+            return match.group(0)
+
+        if target_id == "unresolved":
+            print(f"Warning: link '{href}' points at a doc that isn't currently synced, leaving it unchanged")
+            return match.group(0)
+
+        page_id = target_id or current_page_id
+        block_id = None
+        if anchor:
+            block_id = slug_to_block_id(page_id, anchor)
+            if block_id is None:
+                print(f"Warning: no Notion heading matches anchor #{anchor} on page {page_id}, linking to the page instead")
+        return f"[{text}]({notion_internal_link(page_id, block_id)})"
+
+    return MARKDOWN_LINK_RE.sub(replace, markdown)
 
 
 def localize_images(markdown: str, assets_dir: Path) -> str:

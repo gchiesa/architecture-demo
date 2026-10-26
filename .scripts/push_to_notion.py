@@ -22,26 +22,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from notion_sync_lib import REPO_ROOT, content_hash, get_page, push_page_markdown
-
-FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
-
-
-def parse_file(raw: str) -> tuple[dict, str]:
-    match = FRONTMATTER_RE.match(raw)
-    if not match:
-        return {}, raw
-    fields: dict[str, str] = {}
-    for line in match.group(1).splitlines():
-        if ":" not in line:
-            continue
-        key, _, raw_value = line.partition(":")
-        key = key.strip()
-        raw_value = raw_value.strip()
-        if raw_value.startswith('"') and raw_value.endswith('"'):
-            raw_value = raw_value[1:-1]
-        fields[key] = raw_value
-    return fields, match.group(2)
+from notion_sync_lib import (
+    REPO_ROOT,
+    content_hash,
+    get_page,
+    load_sections,
+    parse_frontmatter,
+    push_page_markdown,
+    rewrite_repo_links_to_notion,
+    scan_local_doc_registry,
+)
 
 
 def set_frontmatter_field(raw: str, key: str, value: str) -> str:
@@ -62,9 +52,9 @@ def warn(path: Path, message: str) -> None:
         print(f"WARNING {path}: {message}")
 
 
-def process_file(path: Path, notion_secret: str) -> None:
+def process_file(path: Path, notion_secret: str, local_registry: dict[str, str]) -> None:
     raw = path.read_text(encoding="utf-8")
-    fields, body = parse_file(raw)
+    fields, body = parse_frontmatter(raw)
 
     page_id = fields.get("id")
     if not page_id:
@@ -89,7 +79,10 @@ def process_file(path: Path, notion_secret: str) -> None:
         )
         return
 
-    result = push_page_markdown(notion_secret, page_id, body)
+    notion_body = rewrite_repo_links_to_notion(
+        body, page_id.replace("-", ""), path.parent, local_registry, notion_secret
+    )
+    result = push_page_markdown(notion_secret, page_id, notion_body)
     for notion_warning in result.get("warnings", []):
         warn(path, f"Notion API warning: {notion_warning}")
 
@@ -107,11 +100,13 @@ def main() -> None:
         print("No changed files passed, nothing to push")
         return
 
+    local_registry = scan_local_doc_registry([section["root"] for section in load_sections()])
+
     for rel_path in changed_files:
         path = REPO_ROOT / rel_path
         if path.name != "README.md" or not path.exists():
             continue
-        process_file(path, notion_secret)
+        process_file(path, notion_secret, local_registry)
 
 
 if __name__ == "__main__":
