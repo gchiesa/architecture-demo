@@ -33,6 +33,10 @@ export default withMermaid(
       outline: { level: [2, 3] },
       search: { provider: 'local' },
       socialLinks: [{ icon: 'github', link: 'https://github.com/gchiesa/architecture-demo' }],
+      editLink: {
+        pattern: 'https://github.com/gchiesa/architecture-demo/edit/main/:path',
+        text: 'Edit this page on GitHub',
+      },
     },
 
     mermaid: {
