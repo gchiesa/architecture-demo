@@ -330,8 +330,16 @@ def _rich_text_plain(rich_text: list[dict]) -> str:
 
 
 def build_dest_relative_link(current_dir: Path, target_dir: Path, anchor: str | None) -> str:
+    """A directory-relative link, deliberately not `.../README.md`: VitePress's
+    `rewrites` config (`README.md` -> `index.md`) only changes where the
+    source file itself builds to, not how its markdown link transform
+    rewrites a literal `README.md` href - that just becomes `README.html`,
+    which is never a real output file. A trailing-slash directory link
+    resolves correctly post-build, and still lands on the right folder in
+    GitHub's own file browser (one extra click to open the README there,
+    not a broken link)."""
     rel = Path(os.path.relpath(target_dir, start=current_dir))
-    href = "README.md" if rel == Path(".") else f"{rel.as_posix()}/README.md"
+    href = "./" if rel == Path(".") else f"{rel.as_posix()}/"
     return f"{href}#{anchor}" if anchor else href
 
 
@@ -404,14 +412,19 @@ def resolve_repo_link_target(
     direction. Returns `(target_page_id, anchor, recognized)`:
     - `recognized=False` means this isn't a doc link in scope for this
       feature (external URL, already a Notion-native `/p/...` link, or a
-      relative path to something other than another doc's `README.md`) -
-      the caller must leave it untouched.
+      relative path to something other than another doc's directory) - the
+      caller must leave it untouched.
     - `recognized=True` with `target_page_id=None` means a bare `#anchor`
       (same-page link) - the caller resolves it against the current page.
     - `recognized=True` with `target_page_id=None` and `anchor=None` *and*
-      the href was a non-empty, resolvable `README.md` path not in the
+      the href was a non-empty, resolvable doc-directory path not in the
       registry means the target doc isn't currently synced - handled by the
       caller as "unresolved internal".
+
+    Accepts both link forms a doc's body might contain: the directory-relative
+    form `sync_notion.py` itself writes (e.g. `../other-doc/`, see
+    `build_dest_relative_link`), and an explicit `.../README.md` path, in
+    case a person hand-writes one.
     """
     path_part, _, fragment = href.partition("#")
     anchor = fragment or None
@@ -423,10 +436,14 @@ def resolve_repo_link_target(
         return None, None, False  # external, or already Notion-native
 
     target_path = (current_dir / path_part).resolve()
-    if target_path.name != "README.md":
+    if target_path.name == "README.md":
+        candidate_dir = target_path.parent
+    elif target_path.is_dir() and (target_path / "README.md").exists():
+        candidate_dir = target_path
+    else:
         return None, None, False
     try:
-        rel_dir = target_path.parent.relative_to(REPO_ROOT).as_posix()
+        rel_dir = candidate_dir.relative_to(REPO_ROOT).as_posix()
     except ValueError:
         return None, None, False
 
