@@ -6,7 +6,7 @@ created_time: "2026-10-21T11:07:00.000Z"
 last_edited_time: "2026-10-26T11:52:00.000Z"
 notion_url: "https://app.notion.com/p/Use-GraphQL-for-Frontend-Data-Fetching-40096cd65ae08162a5f2e55509da500e"
 doc_url: "https://architecture-demo.g-c.dev/ADR/area/frontend/use-graphql-for-frontend-data-fetching/"
-content_hash: "721cdaafc7933a448dce748e31a610e5e678a7865c883ba97a0f6ab85f899ab1"
+content_hash: "fda203978d4d7c3958055b776d51197fb1840525a297fd191e89d1abb7d94d94"
 type: "ADR"
 scope: "Area"
 area: "Frontend"
@@ -19,7 +19,7 @@ Frontend teams currently call a mix of REST endpoints per page, leading to over-
 
 All new Frontend-area applications query data through a shared <b>GraphQL gateway</b> instead of calling REST endpoints directly. Existing REST-based apps are migrated opportunistically.
 
-Example link to cross document via [this link](../../../global/adopt-trunk-based-development/README.md)
+Example link to cross document via [this link](../../../global/adopt-trunk-based-development/)
 
 ## Consequences
 
